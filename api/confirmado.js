@@ -1,31 +1,38 @@
-// Endpoint para receber webhooks da Hotmart
-// URL: https://autoavaliacao-comportamental.vercel.app/api/confirmado
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export default async function handler(req, res) {
-  // Permitir apenas requisições POST
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido. Use POST.' });
+    return res.status(405).json({ error: 'Método não permitido' });
   }
 
   try {
-    // Registrar o corpo da requisição no console
-    console.log('=== WEBHOOK HOTMART RECEBIDO ===' );
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('Body:', JSON.stringify(req.body, null, 2));
-    console.log('================================');
+    console.log('Webhook recebido:', req.body);
 
-    // Responder com sucesso
-    return res.status(200).json({ 
-      message: 'OK',
-      received: true,
-      timestamp: new Date().toISOString()
+    const { buyer } = req.body;
+    const emailCliente = buyer?.email || 'teste@example.com';
+    const nomeCliente = buyer?.name || 'Cliente';
+
+    await resend.emails.send({
+      from: 'Autoavaliação <no-reply@seu-dominio.com>',
+      to: emailCliente,
+      subject: 'Seu acesso ao Teste Educativo Online 🎓',
+      html: `
+        <h2>Olá, ${nomeCliente}!</h2>
+        <p>Seu pagamento foi aprovado ✅</p>
+        <p>Aqui está o link para acessar o teste:</p>
+        <a href="https://autoavaliacao-comportamental.vercel.app" target="_blank">
+          👉 Clique aqui para iniciar o teste
+        </a>
+        <br><br>
+        <p>Qualquer dúvida, estamos à disposição!</p>
+      `,
     });
+
+    return res.status(200).json({ success: true, message: 'E-mail enviado com sucesso!' });
   } catch (error) {
-    console.error('Erro ao processar webhook:', error);
-    return res.status(500).json({ 
-      error: 'Erro interno do servidor',
-      message: error.message 
-    });
+    console.error('Erro ao enviar e-mail:', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 }
