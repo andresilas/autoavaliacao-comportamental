@@ -1,0 +1,10 @@
+{
+  "name": "autoavaliacao-comportamental",
+  "version": "1.0.0",
+  "description": "Função serverless para envio de e-mail com Resend",
+  "main": "api/confirmado.js",
+  "type": "module",
+  "dependencies": {
+    "resend": "^3.0.0"
+  }
+}
