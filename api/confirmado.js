@@ -47,8 +47,8 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Resultado não encontrado' });
     }
 
-    // Gerar PDF com os dados
-    const pdfBase64 = generatePDFBase64(savedData);
+    // URL da página de resultado
+    const resultUrl = `https://autoavaliacao-comportamental.vercel.app/resultado.html?email=${encodeURIComponent(email)}`;
 
     // Enviar e-mail com Resend
     await resend.emails.send({
@@ -59,12 +59,11 @@ export default async function handler(req, res) {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #1565c0;">Olá, ${savedData.responsavel}!</h2>
           <p>Seu relatório da <strong>Autoavaliação Comportamental Infantil</strong> está pronto.</p>
-          <p>Clique no botão abaixo para baixar o resultado completo em PDF.</p>
+          <p>Clique no botão abaixo para acessar o resultado completo.</p>
           <div style="text-align: center; margin: 30px 0;">
-            <a href="data:application/pdf;base64,${pdfBase64}" 
-               download="relatorio-autoavaliacao.pdf"
+            <a href="${resultUrl}" 
                style="background: #1976d2; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; display: inline-block;">
-              Baixar Relatório
+              Ver Resultado
             </a>
           </div>
           <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin-top: 20px;">
@@ -77,49 +76,21 @@ export default async function handler(req, res) {
           </p>
         </div>
       `,
-      attachments: [
-        {
-          filename: 'relatorio-autoavaliacao.pdf',
-          content: pdfBase64,
-        }
-      ]
     });
 
     console.log('E-mail enviado com sucesso para:', email);
 
     return res.status(200).json({ 
-      success: true, 
-      message: 'E-mail enviado com sucesso' 
+      message: 'E-mail enviado com sucesso',
+      email,
+      resultUrl
     });
 
   } catch (error) {
-    console.error('Erro no webhook:', error);
+    console.error('Erro ao processar webhook:', error);
     return res.status(500).json({ 
       error: 'Erro ao processar webhook',
-      details: error.message 
+      details: error.message
     });
   }
-}
-
-// Função para gerar PDF em Base64
-function generatePDFBase64(data) {
-  // Conteúdo básico do PDF em texto
-  const pdfContent = `
-Autoavaliação Comportamental Infantil
-Relatório Educativo
-
-Responsável: ${data.responsavel}
-Idade da criança: ${data.idade} anos
-Pontuação total: ${data.score}
-Nível: ${data.nivel}
-
-${data.mensagem}
-
-Esta ferramenta é educativa e não substitui avaliação profissional.
-Para mais informações, consulte um especialista.
-  `.trim();
-
-  // Converter para Base64 (simulação simplificada)
-  // Em produção, use uma biblioteca como jsPDF ou pdfkit
-  return Buffer.from(pdfContent).toString('base64');
 }
