@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { getResult } from './save-result';
 
 export default async function handler(req, res) {
   // Verificar se o método é POST
@@ -20,65 +21,36 @@ export default async function handler(req, res) {
     // Se temos um e-mail válido, enviar e-mail de confirmação
     if (buyerEmail) {
       const resend = new Resend(process.env.RESEND_API_KEY);
+
+            // Tentar buscar resultado salvo
+            const savedResult = getResult(buyerEmail);
+
+            if (savedResult) {
+                      const { responsavel, idade, score, nivel, mensagem } = savedResult;
+
+                      // Enviar email com dados reais
+                      await resend.emails.send({
+                                  from: 'Autoavaliação Comportamental <onboarding@resend.dev>',
+                                  to: buyerEmail,
+                                  subject: `Resultado do Teste - ${nivel}`,
+                                  html: `
+                                              <h2>Resultado do Teste</h2>
+                                                          <p><strong>Responsável:</strong> ${responsavel}</p>
+                                                                      <p><strong>Idade da Criança:</strong> ${idade} anos</p>
+                                                                                  <p><strong>Pontuação:</strong> ${score}</p>
+                                                                                              <p><strong>Nível:</strong> ${nivel}</p>
+                                                                                                          <p>${mensagem}</p>
+                                                                                                                      <a href="https://autoavaliacao-comportamental.vercel.app/resultado?email=${encodeURIComponent(buyerEmail)}">
+                                                                                                                                    👉 Acessar Resultado Completo
+                                                                                                                                                </a>
+                                                                                                                                                          `,
+                                });
+
+                      console.log(`Email enviado com dados reais para ${buyerEmail}`);
+                    } else {
+                      console.warn(`Nenhum resultado encontrado para ${buyerEmail}. Enviando email genérico.`);
+                    }
       
-      const resultUrl = `https://autoavaliacao-comportamental.vercel.app/?pagamento=confirmado&email=${encodeURIComponent(buyerEmail)}`;
-      
-      await resend.emails.send({
-        from: 'Autoavaliação Comportamental <onboarding@resend.dev>',
-        to: buyerEmail,
-        subject: 'Acesso liberado - Autoavaliação Comportamental Infantil',
-        html: `
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="UTF-8">
-              <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background: #1565c0; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-                .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-                .button { display: inline-block; background: #1976d2; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
-                .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <div class="header">
-                  <h1>🧩 Autoavaliação Comportamental Infantil</h1>
-                </div>
-                <div class="content">
-                  <p>Olá, <strong>${buyerName}</strong>!</p>
-                  
-                  <p>Obrigado por adquirir o teste <strong>Autoavaliação Comportamental Infantil</strong>.</p>
-                  
-                  <p>Seu pagamento foi confirmado com sucesso! Agora você já pode acessar o questionário completo e, após responder, visualizar o resultado detalhado e baixar o relatório em PDF.</p>
-                  
-                  <p style="text-align: center;">
-                    <a href="${resultUrl}" class="button">Acessar o Teste</a>
-                  </p>
-                  
-                  <p><strong>O que você vai ter acesso:</strong></p>
-                  <ul>
-                    <li>Questionário completo com 20 perguntas</li>
-                    <li>Resultado detalhado e personalizado</li>
-                    <li>Relatório em PDF para download</li>
-                    <li>Orientações baseadas na pontuação</li>
-                  </ul>
-                  
-                  <p><em>Lembre-se: Esta é uma ferramenta educativa e não substitui avaliação médica ou psicológica profissional.</em></p>
-                </div>
-                <div class="footer">
-                  <p>Qualquer dúvida, responda este e-mail.</p>
-                  <p>© 2025 Autoavaliação Comportamental Infantil</p>
-                </div>
-              </div>
-            </body>
-          </html>
-        `
-      });
-      
-      console.log(`E-mail enviado com sucesso para ${buyerEmail}`);
-    }
     
     // Responder com sucesso
     return res.status(200).json({ 
