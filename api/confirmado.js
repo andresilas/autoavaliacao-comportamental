@@ -1,107 +1,109 @@
 // API Serverless para webhook Hotmart com envio automático de PDF por e-mail
 import { Resend } from 'resend';
 import { getResult } from './save-result';
+import PDFDocument from 'pdfkit';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Função para gerar o HTML do PDF
-function generatePDFHTML(data) {
-  const { responsavel, crianca, idade, pontuacao, categoria, nivel, explicacao } = data;
-  
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 40px;
-          color: #333;
-        }
-        .header {
-          text-align: center;
-          border-bottom: 3px solid #1976d2;
-          padding-bottom: 20px;
-          margin-bottom: 30px;
-        }
-        h1 {
-          color: #1565c0;
-          margin: 0;
-        }
-        .info-section {
-          background: #f5f5f5;
-          padding: 20px;
-          border-radius: 8px;
-          margin-bottom: 20px;
-        }
-        .result-box {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 30px;
-          border-radius: 12px;
-          text-align: center;
-          margin: 30px 0;
-        }
-        .score {
-          font-size: 48px;
-          font-weight: bold;
-          margin: 10px 0;
-        }
-        .category {
-          font-size: 24px;
-          margin: 10px 0;
-        }
-        .explanation {
-          background: #fff3cd;
-          border-left: 4px solid #ffc107;
-          padding: 20px;
-          margin: 20px 0;
-          border-radius: 4px;
-        }
-        .footer {
-          text-align: center;
-          margin-top: 40px;
-          padding-top: 20px;
-          border-top: 1px solid #ddd;
-          font-size: 12px;
-          color: #666;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>Relatório de Autoavaliação Comportamental Infantil</h1>
-      </div>
-      
-      <div class="info-section">
-        <p><strong>Responsável:</strong> ${responsavel}</p>
-        <p><strong>Criança:</strong> ${crianca}</p>
-        <p><strong>Idade:</strong> ${idade} anos</p>
-        <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
-      </div>
-      
-      <div class="result-box">
-        <div class="score">${pontuacao} pontos</div>
-        <div class="category">${categoria}</div>
-        <div>${nivel}</div>
-      </div>
-      
-      <div class="explanation">
-        <h3>Interpretação do Resultado</h3>
-        <p>${explicacao}</p>
-      </div>
-      
-      <div class="footer">
-        <p><strong>⚠️ Aviso Importante:</strong></p>
-        <p>Este relatório é apenas educativo e informativo. Não substitui avaliação médica ou psicológica profissional.</p>
-        <p>Em caso de dúvidas ou preocupações, consulte um profissional qualificado.</p>
-      </div>
-    </body>
-    </html>
-  `;
+// Função para gerar PDF usando PDFKit
+async function generatePDF(data) {
+  return new Promise((resolve, reject) => {
+    const { responsavel, crianca, idade, pontuacao, categoria, nivel, explicacao } = data;
+    
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    const chunks = [];
+    
+    // Coletar chunks do PDF
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      resolve(pdfBuffer);
+    });
+    doc.on('error', reject);
+    
+    // Cabeçalho
+    doc.fontSize(24)
+       .fillColor('#1565c0')
+       .text('Relatório de Autoavaliação', { align: 'center' });
+    
+    doc.fontSize(18)
+       .text('Comportamental Infantil', { align: 'center' });
+    
+    doc.moveDown(1.5);
+    doc.moveTo(50, doc.y)
+       .lineTo(545, doc.y)
+       .strokeColor('#1976d2')
+       .lineWidth(3)
+       .stroke();
+    
+    doc.moveDown(1.5);
+    
+    // Informações do relatório
+    doc.fontSize(12)
+       .fillColor('#333');
+    
+    doc.text(`Responsável: ${responsavel}`, { continued: false });
+    doc.moveDown(0.5);
+    doc.text(`Criança: ${crianca}`);
+    doc.moveDown(0.5);
+    doc.text(`Idade: ${idade} anos`);
+    doc.moveDown(0.5);
+    doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`);
+    
+    doc.moveDown(2);
+    
+    // Box do resultado
+    const boxY = doc.y;
+    doc.rect(50, boxY, 495, 150)
+       .fillAndStroke('#667eea', '#764ba2');
+    
+    doc.fillColor('#ffffff')
+       .fontSize(48)
+       .text(`${pontuacao}`, 50, boxY + 20, { width: 495, align: 'center' });
+    
+    doc.fontSize(14)
+       .text('pontos', { width: 495, align: 'center' });
+    
+    doc.moveDown(0.5);
+    doc.fontSize(22)
+       .text(categoria, { width: 495, align: 'center' });
+    
+    doc.moveDown(0.3);
+    doc.fontSize(14)
+       .text(nivel, { width: 495, align: 'center' });
+    
+    doc.moveDown(4);
+    
+    // Explicação
+    const explY = doc.y;
+    doc.rect(46, explY - 5, 503, doc.heightOfString(explicacao, { width: 480 }) + 30)
+       .fillAndStroke('#fff3cd', '#ffc107');
+    
+    doc.fillColor('#333')
+       .fontSize(14)
+       .font('Helvetica-Bold')
+       .text('Interpretação do Resultado', 55, explY + 5);
+    
+    doc.moveDown(0.5);
+    doc.font('Helvetica')
+       .fontSize(11)
+       .text(explicacao, { width: 480, align: 'justify' });
+    
+    doc.moveDown(3);
+    
+    // Rodapé
+    doc.fontSize(10)
+       .fillColor('#666')
+       .text('⚠️ Aviso Importante:', { continued: false });
+    
+    doc.moveDown(0.5);
+    doc.fontSize(9)
+       .text('Este relatório é apenas educativo e informativo. Não substitui avaliação médica ou psicológica profissional.', { align: 'center' });
+    doc.text('Em caso de dúvidas ou preocupações, consulte um profissional qualificado.', { align: 'center' });
+    
+    // Finalizar PDF
+    doc.end();
+  });
 }
 
 export default async function handler(req, res) {
@@ -149,8 +151,10 @@ export default async function handler(req, res) {
 
     console.log('Gerando PDF para:', email);
 
-    // Gerar HTML do PDF
-    const pdfHTML = generatePDFHTML(savedData);
+    // Gerar PDF
+    const pdfBuffer = await generatePDF(savedData);
+
+    console.log('PDF gerado, enviando e-mail...');
 
     // Enviar e-mail com PDF usando Resend
     await resend.emails.send({
@@ -186,8 +190,7 @@ export default async function handler(req, res) {
       attachments: [
         {
           filename: `Relatorio_${savedData.crianca.replace(/\s/g, '_')}.pdf`,
-          content: Buffer.from(pdfHTML).toString('base64'),
-          content_type: 'text/html' // Resend vai converter HTML para PDF
+          content: pdfBuffer,
         }
       ]
     });
