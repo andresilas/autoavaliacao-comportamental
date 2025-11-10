@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Seu Resultado - Autoavaliação Comportamental Infantil</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#eaf4fb;color:#333;padding:20px}
+.header{background:#1565c0;color:#fff;padding:28px 24px;text-align:center;box-shadow:0 2px 8px rgba(21,101,192,0.15);border-radius:10px 10px 0 0}
+.header h1{font-size:2em;margin-bottom:10px;font-weight:600}
+.container{max-width:800px;margin:30px auto;background:#fff;border-radius:10px;box-shadow:0 3px 15px rgba(21,101,192,0.12)}
+.content{padding:40px}
+.loading{text-align:center;padding:60px 20px}
+.loading h2{color:#1565c0;margin-bottom:20px}
+.spinner{border:4px solid #f3f3f3;border-top:4px solid #1976d2;border-radius:50%;width:50px;height:50px;animation:spin 1s linear infinite;margin:20px auto}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.result{display:none}
+.result h2{color:#1565c0;margin-bottom:20px;font-size:1.8em}
+.info-box{background:#f5f5f5;padding:20px;border-radius:8px;margin:20px 0}
+.info-box p{margin:10px 0;font-size:1.1em}
+.info-box strong{color:#1565c0}
+.nivel-box{background:#e8f5e9;border-left:5px solid #4caf50;padding:20px;margin:25px 0;border-radius:6px}
+.nivel-box.moderado{background:#fff3cd;border-left-color:#ffc107}
+.nivel-box.alto{background:#ffebee;border-left-color:#f44336}
+.nivel-box h3{color:#2e7d32;margin-bottom:15px;font-size:1.4em}
+.nivel-box.moderado h3{color:#f57c00}
+.nivel-box.alto h3{color:#c62828}
+.nivel-box p{line-height:1.6;font-size:1.05em}
+.warning-box{background:#fff3cd;border-left:5px solid #ffc107;padding:16px;margin:25px 0;border-radius:6px}
+.warning-box p{margin:0;font-size:0.95em;line-height:1.6}
+.btn{background:#1976d2;color:#fff;border:none;padding:16px 32px;border-radius:6px;font-size:1.1em;cursor:pointer;width:100%;margin-top:20px;transition:all 0.3s;font-weight:600;text-decoration:none;display:inline-block;text-align:center}
+.btn:hover{background:#0d47a1;transform:translateY(-2px)}
+.btn-secondary{background:#4caf50}
+.btn-secondary:hover{background:#388e3c}
+.error{background:#ffebee;border-left:5px solid #f44336;padding:20px;margin:20px 0;border-radius:6px}
+.error h3{color:#c62828;margin-bottom:10px}
+.error p{color:#666}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>🧩 Seu Resultado</h1>
+<p>Autoavaliação Comportamental Infantil</p>
+</div>
+<div class="content">
+<div class="loading" id="loading">
+<h2>Carregando seu resultado...</h2>
+<div class="spinner"></div>
+<p style="color:#666;margin-top:20px">Aguarde enquanto recuperamos seus dados</p>
+</div>
+<div class="result" id="result">
+<h2>✓ Resultado da Avaliação</h2>
+<div class="info-box">
+<p><strong>Responsável:</strong> <span id="responsavel"></span></p>
+<p><strong>Idade da criança:</strong> <span id="idade"></span> anos</p>
+<p><strong>Pontuação total:</strong> <span id="score"></span></p>
+</div>
+<div class="nivel-box" id="nivel-box">
+<h3 id="nivel"></h3>
+<p id="mensagem"></p>
+</div>
+<div class="warning-box">
+<p><strong>⚠️ Importante:</strong> Este conteúdo é educativo e não substitui avaliação médica ou psicológica profissional. Resultados não têm validade para laudo. Para orientação adequada, consulte um especialista.</p>
+</div>
+<button class="btn btn-secondary" onclick="downloadPDF()">📄 Baixar Relatório em PDF</button>
+<a href="/" class="btn" style="margin-top:10px">🏠 Fazer Novo Teste</a>
+</div>
+<div class="error" id="error" style="display:none">
+<h3>❌ Erro ao Carregar Resultado</h3>
+<p id="error-message"></p>
+<a href="/" class="btn">Voltar ao Início</a>
+</div>
+</div>
+</div>
+<script>
+let resultData = null;
+
+async function loadResult() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const email = urlParams.get('email');
+  
+  if (!email) {
+    showError('E-mail não fornecido. Por favor, acesse através do link enviado por e-mail.');
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/get-result?email=${encodeURIComponent(email)}`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        showError('Resultado não encontrado. Verifique se você já completou o teste e realizou o pagamento.');
+      } else {
+        showError('Erro ao carregar resultado. Tente novamente mais tarde.');
+      }
+      return;
+    }
+    
+    const data = await response.json();
+    resultData = data;
+    displayResult(data);
+    
+  } catch (error) {
+    console.error('Erro:', error);
+    showError('Erro de conexão. Verifique sua internet e tente novamente.');
+  }
+}
+
+function displayResult(data) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('result').style.display = 'block';
+  
+  document.getElementById('responsavel').textContent = data.responsavel;
+  document.getElementById('idade').textContent = data.idade;
+  document.getElementById('score').textContent = data.score;
+  document.getElementById('nivel').textContent = data.nivel;
+  document.getElementById('mensagem').textContent = data.mensagem;
+  
+  const nivelBox = document.getElementById('nivel-box');
+  nivelBox.className = 'nivel-box';
+  if (data.score >= 11 && data.score <= 24) {
+    nivelBox.classList.add('moderado');
+  } else if (data.score > 24) {
+    nivelBox.classList.add('alto');
+  }
+}
+
+function showError(message) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('error').style.display = 'block';
+  document.getElementById('error-message').textContent = message;
+}
+
+function downloadPDF() {
+  if (!resultData) return;
+  
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  
+  doc.setFontSize(20);
+  doc.text('Autoavaliação Comportamental Infantil', 20, 20);
+  
+  doc.setFontSize(14);
+  doc.text('Relatório Educativo', 20, 32);
+  
+  doc.setFontSize(12);
+  doc.text(`Responsável: ${resultData.responsavel}`, 20, 50);
+  doc.text(`Idade da criança: ${resultData.idade} anos`, 20, 58);
+  doc.text(`Pontuação total: ${resultData.score}`, 20, 66);
+  doc.text(`Nível: ${resultData.nivel}`, 20, 74);
+  
+  doc.setFontSize(11);
+  const lines = doc.splitTextToSize(resultData.mensagem, 170);
+  doc.text(lines, 20, 85);
+  
+  doc.text('Esta ferramenta é educativa e não substitui avaliação profissional.', 20, 110);
+  
+  doc.save('autoavaliacao_relatorio.pdf');
+}
+
+window.addEventListener('DOMContentLoaded', loadResult);
+</script>
+</body>
+</html>
